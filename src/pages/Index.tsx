@@ -63,36 +63,32 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground mb-2">Punjab Transit Dashboard</h2>
-          <p className="text-muted-foreground">Real-time tracking and passenger management for tier-2 cities</p>
-        </div>
+    <div className="space-y-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground mb-2">Punjab Transit Dashboard</h1>
+        <p className="text-muted-foreground">Real-time tracking and passenger management for tier-2 cities</p>
+      </div>
 
-        <StatsOverview />
+      <StatsOverview />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <MapView />
-          
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Live Bus Updates</h3>
-            <div className="space-y-3 max-h-80 lg:max-h-96 overflow-y-auto pr-2">
-              {mockBuses.slice(0, 4).map((bus, index) => (
-                <BusCard key={index} {...bus} />
-              ))}
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <MapView />
+        
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-foreground">Live Bus Updates</h3>
+          <div className="space-y-3 max-h-80 lg:max-h-96 overflow-y-auto pr-2">
+            {mockBuses.slice(0, 4).map((bus, index) => (
+              <BusCard key={index} {...bus} />
+            ))}
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {mockBuses.slice(4).map((bus, index) => (
-            <BusCard key={index + 4} {...bus} />
-          ))}
-        </div>
-      </main>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {mockBuses.slice(4).map((bus, index) => (
+          <BusCard key={index + 4} {...bus} />
+        ))}
+      </div>
     </div>
   );
 };
