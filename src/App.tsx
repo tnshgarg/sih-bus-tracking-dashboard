@@ -17,7 +17,7 @@ const queryClient = new QueryClient();
 const Layout = ({ children }: { children: React.ReactNode }) => (
   <div className="flex min-h-screen bg-background">
     <Sidebar />
-    <main className="flex-1 lg:ml-72 p-6">
+    <main className="flex-1 lg:ml-20 md:ml-20 p-10 md:p-5 lg:p-4">
       {children}
     </main>
   </div>
