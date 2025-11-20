@@ -56,6 +56,14 @@ const Sidebar = () => {
       icon: Shield,
       description: "System administration"
     }
+    ,
+    {
+      name: "Consumer Buses",
+      href: "/consumer-buses",
+      icon: Bus,
+      description: "View & filter buses (public user)"
+
+    }
   ];
 
   return (
