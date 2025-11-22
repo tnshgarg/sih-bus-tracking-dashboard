@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,77 +20,101 @@ import {
 
 const PassengerPortal = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
-  const popularRoutes = [
-    {
-      id: "R-001",
-      name: "Jalandhar to Amritsar",
-      nextBus: "8 min",
-      occupancy: 68,
-      fare: "₹45",
-      rating: 4.2,
-      stops: 12,
-      duration: "1h 45m"
-    },
-    {
-      id: "R-002", 
-      name: "Ludhiana to Chandigarh",
-      nextBus: "5 min",
-      occupancy: 45,
-      fare: "₹65",
-      rating: 4.5,
-      stops: 18,
-      duration: "2h 15m"
-    },
-    {
-      id: "R-003",
-      name: "Amritsar to Pathankot",
-      nextBus: "12 min",
-      occupancy: 95,
-      fare: "₹70",
-      rating: 3.8,
-      stops: 15,
-      duration: "2h 30m"
-    }
-  ];
+  type PassengerRoute = {
+    id: string;
+    name: string;
+    startPoint: string;
+    endPoint: string;
+    stops: string;
+    duration: string;
+    rating?: number;
+  };
 
-  const upcomingBuses = [
-    {
-      busNumber: "PB-2501",
-      route: "Jalandhar → Amritsar",
-      departure: "2:15 PM",
-      platform: "Platform 3",
-      occupancy: 68,
-      capacity: 80,
-      fare: "₹45",
-      amenities: ["AC", "WiFi", "USB Charging"]
-    },
-    {
-      busNumber: "PB-1847",
-      route: "Ludhiana → Chandigarh", 
-      departure: "2:22 PM",
-      platform: "Platform 1",
-      occupancy: 45,
-      capacity: 80,
-      fare: "₹65",
-      amenities: ["AC", "WiFi", "GPS Tracking"]
-    },
-    {
-      busNumber: "CH-5623",
-      route: "Chandigarh → Patiala",
-      departure: "2:30 PM", 
-      platform: "Platform 2",
-      occupancy: 62,
-      capacity: 80,
-      fare: "₹55",
-      amenities: ["AC", "USB Charging", "Emergency Contact"]
+  type LiveBus = {
+    busNumber: string;
+    route: string;
+    lastUpdate: string;
+    speed: number | null;
+    lat: number;
+    lng: number;
+  };
+
+  const [routes, setRoutes] = useState<PassengerRoute[]>([]);
+  const [liveBuses, setLiveBuses] = useState<LiveBus[]>([]);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+  const [isLoadingBuses, setIsLoadingBuses] = useState(false);
+
+  const API_BASE_URL = (import.meta as any).env.VITE_API_URL || "http://localhost:3000";
+  const API_BASE_PATH = (import.meta as any).env.VITE_API_BASE_PATH || "/etm/v1";
+  const API_TOKEN = (import.meta as any).env.VITE_API_TOKEN || "demo_token_12345";
+
+  const fetchRoutes = async () => {
+    try {
+      setIsLoadingRoutes(true);
+      const res = await fetch(`${API_BASE_URL}${API_BASE_PATH}/routes`, {
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load routes");
+      const data = await res.json();
+      const mapped: PassengerRoute[] = (data.routes || []).map((r: any) => ({
+        id: r.route_id,
+        name: r.name,
+        startPoint: r.start_point,
+        endPoint: r.end_point,
+        stops: r.stops,
+        duration: r.avg_duration || "",
+        rating: 4.0, // placeholder rating until backed by real data
+      }));
+      setRoutes(mapped);
+    } catch (err) {
+      console.error("Error loading routes for passenger portal:", err);
+    } finally {
+      setIsLoadingRoutes(false);
     }
-  ];
+  };
+
+  const fetchLiveBuses = async (routeId: string, routeLabel: string) => {
+    try {
+      setIsLoadingBuses(true);
+      const res = await fetch(
+        `${API_BASE_URL}${API_BASE_PATH}/route/${routeId}/live-buses`,
+        {
+          headers: {
+            Authorization: `Bearer ${API_TOKEN}`,
+          },
+        }
+      );
+      if (!res.ok) throw new Error("Failed to load live buses");
+      const data = await res.json();
+      const mapped: LiveBus[] = (data.buses || []).map((b: any) => ({
+        busNumber: b.bus_id,
+        route: routeLabel,
+        lastUpdate: new Date(b.last_update).toLocaleTimeString(),
+        speed: b.speed_kmph,
+        lat: b.lat,
+        lng: b.lng,
+      }));
+      setLiveBuses(mapped);
+    } catch (err) {
+      console.error("Error loading live buses:", err);
+      setLiveBuses([]);
+    } finally {
+      setIsLoadingBuses(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRoutes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getOccupancyColor = (occupancy: number) => {
-    if (occupancy < 70) return "success";
-    if (occupancy < 90) return "warning";
+    if (occupancy < 70) return "default";
+    if (occupancy < 90) return "secondary";
     return "destructive";
   };
 
@@ -99,6 +123,12 @@ const PassengerPortal = () => {
     if (occupancy < 90) return "Filling Fast";
     return "Nearly Full";
   };
+
+  const filteredRoutes = routes.filter((r) =>
+    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.startPoint.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.endPoint.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -129,23 +159,45 @@ const PassengerPortal = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {popularRoutes.map((route) => (
+                {isLoadingRoutes && (
+                  <div className="text-sm text-muted-foreground">Loading routes...</div>
+                )}
+                {!isLoadingRoutes && filteredRoutes.length === 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    No routes found. Try a different search.
+                  </div>
+                )}
+                {!isLoadingRoutes && filteredRoutes.map((route) => (
                 <div
                   key={route.id}
                   className="p-4 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => setSelectedRoute(selectedRoute === route.id ? null : route.id)}
+                  onClick={() => {
+                    const isSame = selectedRouteId === route.id;
+                    const nextSelected = isSame ? null : route.id;
+                    setSelectedRouteId(nextSelected);
+                    if (!isSame) {
+                      fetchLiveBuses(
+                        route.id,
+                        `${route.startPoint} → ${route.endPoint}`
+                      );
+                    } else {
+                      setLiveBuses([]);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h4 className="font-semibold text-foreground">{route.name}</h4>
+                      <h4 className="font-semibold text-foreground">
+                        {route.startPoint} → {route.endPoint}
+                      </h4>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span className="flex items-center space-x-1">
                           <Clock className="h-3 w-3" />
-                          <span>{route.duration}</span>
+                          <span>{route.duration || "—"}</span>
                         </span>
                         <span className="flex items-center space-x-1">
                           <MapPin className="h-3 w-3" />
-                          <span>{route.stops} stops</span>
+                          <span>{route.stops}</span>
                         </span>
                         <span className="flex items-center space-x-1">
                           <Star className="h-3 w-3 text-warning fill-current" />
@@ -153,23 +205,20 @@ const PassengerPortal = () => {
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-foreground">{route.fare}</div>
-                      <div className="text-sm text-muted-foreground">per person</div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      Route ID: {route.id}
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center space-x-3">
-                      <span className="text-sm text-muted-foreground">Next bus in:</span>
-                      <Badge variant="default">{route.nextBus}</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Tap to see live buses on this route
+                      </span>
                     </div>
-                    <Badge variant={getOccupancyColor(route.occupancy) as any}>
-                      {getOccupancyText(route.occupancy)}
-                    </Badge>
                   </div>
 
-                  {selectedRoute === route.id && (
+                  {selectedRouteId === route.id && (
                     <div className="mt-4 pt-4 border-t border-border">
                       <div className="flex gap-2">
                         <Button size="sm" className="flex-1">
@@ -195,10 +244,20 @@ const PassengerPortal = () => {
           {/* Upcoming Departures */}
           <Card>
             <CardHeader>
-              <CardTitle>Upcoming Departures</CardTitle>
+              <CardTitle>Live Buses on Selected Route</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {upcomingBuses.map((bus, index) => (
+              {isLoadingBuses && (
+                <div className="text-sm text-muted-foreground">
+                  Loading live buses...
+                </div>
+              )}
+              {!isLoadingBuses && liveBuses.length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  Select a route above to see live buses.
+                </div>
+              )}
+              {!isLoadingBuses && liveBuses.map((bus, index) => (
                 <div key={index} className="p-4 rounded-lg border border-border">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
@@ -211,8 +270,9 @@ const PassengerPortal = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-semibold text-foreground">{bus.departure}</div>
-                      <div className="text-sm text-muted-foreground">{bus.platform}</div>
+                      <div className="text-sm text-muted-foreground">
+                        Last update: {bus.lastUpdate}
+                      </div>
                     </div>
                   </div>
 
@@ -220,23 +280,13 @@ const PassengerPortal = () => {
                     <div className="flex items-center space-x-2">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">
-                        {bus.occupancy}/{bus.capacity} passengers
+                        Speed: {bus.speed != null ? `${bus.speed} km/h` : "—"}
                       </span>
                     </div>
-                    <Badge variant={getOccupancyColor(bus.occupancy) as any}>
-                      {Math.round((bus.occupancy / bus.capacity) * 100)}%
-                    </Badge>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-wrap gap-1">
-                      {bus.amenities.map((amenity, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {amenity}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="text-lg font-semibold text-foreground">{bus.fare}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Location: {bus.lat.toFixed(4)}, {bus.lng.toFixed(4)}
                   </div>
                 </div>
               ))}

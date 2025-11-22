@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,48 +35,9 @@ import {
 } from "@/components/ui/dialog";
 
 
-// ---------------- INITIAL ROUTES ----------------
-const initialRoutes = [
-  {
-    id: "R-001",
-    name: "Jalandhar → Amritsar Express",
-    startPoint: "Jalandhar",
-    endPoint: "Amritsar",
-    stops: "Kartarpur, Beas",
-    distance: "74",
-    avgDuration: "1h 45m",
-    dailyPassengers: 2400,
-    peakOccupancy: 145,
-    status: "optimal",
-    lastUpdated: "2 min ago"
-  },
-  {
-    id: "R-002",
-    name: "Ludhiana → Chandigarh",
-    startPoint: "Ludhiana",
-    endPoint: "Chandigarh",
-    stops: "Kharar, Samrala",
-    distance: "98",
-    avgDuration: "2h 15m",
-    dailyPassengers: 3200,
-    peakOccupancy: 125,
-    status: "good",
-    lastUpdated: "1 min ago"
-  },
-  {
-    id: "R-003",
-    name: "Amritsar → Pathankot (Pilgrimage)",
-    startPoint: "Amritsar",
-    endPoint: "Pathankot",
-    stops: "Batala, Gurdaspur",
-    distance: "112",
-    avgDuration: "2h 30m",
-    dailyPassengers: 1800,
-    peakOccupancy: 165,
-    status: "overcrowded",
-    lastUpdated: "Just now"
-  }
-];
+// ---------------- API BASE URL ----------------
+const API_BASE_URL = "http://localhost:3000/etm/v1";
+const AUTH_TOKEN = "Bearer sk-test-1234567890";
 
 
 // ---------------- SCHEDULE DATA ----------------
@@ -93,8 +54,10 @@ const scheduleData = [
 // =====================================================================
 const RouteManagement = () => {
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
-  const [routesList, setRoutesList] = useState(initialRoutes);
+  const [routesList, setRoutesList] = useState<any[]>([]);
   const [openAdd, setOpenAdd] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // ---------------- ADD ROUTE STATE ----------------
   const [newRoute, setNewRoute] = useState({
@@ -133,85 +96,191 @@ const RouteManagement = () => {
     setStatusOpen(false);
   };
 
-  const applyFilters = () => {
+  const applyFilters = async () => {
+    // Update local filter states
     setStatusFilter(draftStatus);
     setPassengerMin(draftPassengerMin);
     setPeakOccupancyMin(draftPeakOccupancyMin);
     setSearchText(draftSearchText);
     setStatusOpen(false);
+
+    // Fetch routes with backend-supported filters
+    await fetchRoutes({
+      minDailyPassengers: draftPassengerMin,
+      minPeakOccupancy: draftPeakOccupancyMin,
+      search: draftSearchText || null,
+    });
   };
 
-  const resetFilters = () => {
+  const resetFilters = async () => {
+    // Reset draft states
     setDraftStatus(null);
     setDraftPassengerMin(null);
     setDraftPeakOccupancyMin(null);
     setDraftSearchText("");
 
+    // Reset actual filter states
     setStatusFilter(null);
     setPassengerMin(null);
     setPeakOccupancyMin(null);
     setSearchText("");
+
+    // Fetch all routes without filters
+    await fetchRoutes();
   };
 
-  // Filtered Routes
+  // ---------------- FETCH ROUTES WITH FILTERS ----------------
+  const fetchRoutes = async (filters?: {
+    minDailyPassengers?: number | null;
+    minPeakOccupancy?: number | null;
+    search?: string | null;
+  }) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+      if (filters?.minDailyPassengers) {
+        params.append("min_daily_passengers", filters.minDailyPassengers.toString());
+      }
+      
+      if (filters?.minPeakOccupancy) {
+        params.append("min_peak_occupancy", filters.minPeakOccupancy.toString());
+      }
+      
+      if (filters?.search) {
+        params.append("search", filters.search);
+      }
+      
+      const url = `${API_BASE_URL}/routes${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Authorization": AUTH_TOKEN,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch routes");
+      }
+
+      const data = await response.json();
+      
+      // Map backend response to frontend format
+      const formattedRoutes = data.routes.map((route: any) => ({
+        id: `R-${String(route.id).padStart(3, "0")}`,
+        name: route.name,
+        startPoint: route.start_point,
+        endPoint: route.end_point,
+        stops: Array.isArray(route.stops) ? route.stops.join(", ") : route.stops,
+        distance: String(route.distance_km),
+        avgDuration: route.avg_duration,
+        dailyPassengers: route.daily_passengers,
+        peakOccupancy: route.peak_occupancy,
+        status: route.peak_occupancy > 150 ? "overcrowded" : 
+                route.peak_occupancy > 100 ? "good" : "optimal",
+        lastUpdated: new Date(route.updated_at).toLocaleString()
+      }));
+
+      setRoutesList(formattedRoutes);
+    } catch (err) {
+      console.error("Error fetching routes:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch routes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch routes on component mount
+  useEffect(() => {
+    fetchRoutes();
+  }, []);
+
+  // Filtered Routes (frontend filter for status only, since backend doesn't support it)
   const filteredRoutes = routesList.filter((r) => {
     if (statusFilter && r.status !== statusFilter) return false;
-    if (passengerMin !== null && r.dailyPassengers < passengerMin) return false;
-    if (peakOccupancyMin !== null && r.peakOccupancy < peakOccupancyMin) return false;
-
-    if (searchText && !r.name.toLowerCase().includes(searchText.toLowerCase()))
-      return false;
-
     return true;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "optimal": return "success";
-      case "good": return "default";
+      case "optimal": return "default";
+      case "good": return "secondary";
       case "overcrowded": return "destructive";
-      default: return "secondary";
+      default: return "outline";
     }
   };
 
 
   // ---------------- HANDLE ADD ROUTE ----------------
-  const handleAddRoute = () => {
-    const nextIdNumber =
-      routesList.length > 0
-        ? Number(routesList[routesList.length - 1].id.split("-")[1]) + 1
-        : 1;
+  const handleAddRoute = async () => {
+    try {
+      // Validate required fields
+      if (!newRoute.name || !newRoute.startPoint || !newRoute.endPoint ||
+          !newRoute.distance || !newRoute.avgDuration || 
+          !newRoute.dailyPassengers || !newRoute.peakOccupancy) {
+        alert("Please fill in all required fields");
+        return;
+      }
 
-    const newId = `R-${String(nextIdNumber).padStart(3, "0")}`;
+      // Convert comma-separated stops to array
+      const stopsArray = newRoute.stops
+        .split(",")
+        .map(stop => stop.trim())
+        .filter(stop => stop.length > 0);
 
-    const formattedRoute = {
-      id: newId,
-      name: newRoute.name,
-      startPoint: newRoute.startPoint,
-      endPoint: newRoute.endPoint,
-      stops: newRoute.stops,
-      distance: newRoute.distance,
-      avgDuration: newRoute.avgDuration,
-      dailyPassengers: Number(newRoute.dailyPassengers),
-      peakOccupancy: Number(newRoute.peakOccupancy),
-      status: newRoute.status,
-      lastUpdated: "Just now"
-    };
+      // Prepare data for API
+      const routeData = {
+        name: newRoute.name,
+        start_point: newRoute.startPoint,
+        end_point: newRoute.endPoint,
+        stops: stopsArray,
+        distance_km: Number(newRoute.distance),
+        avg_duration: newRoute.avgDuration,
+        daily_passengers: Number(newRoute.dailyPassengers),
+        peak_occupancy: Number(newRoute.peakOccupancy),
+      };
 
-    setRoutesList([...routesList, formattedRoute]);
+      // Call backend API
+      const response = await fetch(`${API_BASE_URL}/routes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": AUTH_TOKEN,
+        },
+        body: JSON.stringify(routeData),
+      });
 
-    setOpenAdd(false);
-    setNewRoute({
-      name: "",
-      startPoint: "",
-      endPoint: "",
-      stops: "",
-      distance: "",
-      avgDuration: "",
-      dailyPassengers: "",
-      peakOccupancy: "",
-      status: "optimal"
-    });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create route");
+      }
+
+      // Close dialog and reset form
+      setOpenAdd(false);
+      setNewRoute({
+        name: "",
+        startPoint: "",
+        endPoint: "",
+        stops: "",
+        distance: "",
+        avgDuration: "",
+        dailyPassengers: "",
+        peakOccupancy: "",
+        status: "optimal"
+      });
+
+      // Refetch routes to get the updated list
+      await fetchRoutes();
+
+      alert("Route created successfully!");
+    } catch (error) {
+      console.error("Error creating route:", error);
+      alert(`Failed to create route: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   };
 
 
@@ -233,6 +302,11 @@ const RouteManagement = () => {
               <Button variant="outline" onClick={initDrafts}>
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
+                {(statusFilter || passengerMin || peakOccupancyMin || searchText) && (
+                  <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                    {[statusFilter, passengerMin, peakOccupancyMin, searchText].filter(Boolean).length}
+                  </Badge>
+                )}
               </Button>
             </DropdownMenuTrigger>
 
@@ -250,7 +324,9 @@ const RouteManagement = () => {
                     setStatusOpen(!statusOpen);
                   }}
                 >
-                  <span className="text-xs text-muted-foreground">Status</span>
+                  <span className="text-xs text-muted-foreground">
+                    Status <span className="text-[10px]">(UI only)</span>
+                  </span>
                   <span className="text-xs text-muted-foreground">{draftStatus ?? "All"}</span>
                 </button>
 
@@ -340,9 +416,10 @@ const RouteManagement = () => {
               <div className="grid grid-cols-2 gap-4 mt-4">
 
                 {/* Route Name */}
-                <div>
-                  <label className="text-sm">Route Name</label>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Route Name *</label>
                   <Input
+                    placeholder="e.g., Jalandhar → Amritsar Express"
                     value={newRoute.name}
                     onChange={(e) => setNewRoute({ ...newRoute, name: e.target.value })}
                   />
@@ -350,8 +427,9 @@ const RouteManagement = () => {
 
                 {/* Start Point */}
                 <div>
-                  <label className="text-sm">Start Point</label>
+                  <label className="text-sm font-medium">Start Point *</label>
                   <Input
+                    placeholder="e.g., Jalandhar"
                     value={newRoute.startPoint}
                     onChange={(e) => setNewRoute({ ...newRoute, startPoint: e.target.value })}
                   />
@@ -359,8 +437,9 @@ const RouteManagement = () => {
 
                 {/* End Point */}
                 <div>
-                  <label className="text-sm">End Point</label>
+                  <label className="text-sm font-medium">End Point *</label>
                   <Input
+                    placeholder="e.g., Amritsar"
                     value={newRoute.endPoint}
                     onChange={(e) => setNewRoute({ ...newRoute, endPoint: e.target.value })}
                   />
@@ -368,17 +447,23 @@ const RouteManagement = () => {
 
                 {/* Major Stops */}
                 <div className="col-span-2">
-                  <label className="text-sm">Major Stops (comma-separated)</label>
+                  <label className="text-sm font-medium">Stops (comma-separated)</label>
                   <Input
+                    placeholder="e.g., Kartarpur, Beas, Tarn Taran"
                     value={newRoute.stops}
                     onChange={(e) => setNewRoute({ ...newRoute, stops: e.target.value })}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter stop names separated by commas
+                  </p>
                 </div>
 
                 {/* Distance */}
                 <div>
-                  <label className="text-sm">Distance (km)</label>
+                  <label className="text-sm font-medium">Distance (km) *</label>
                   <Input
+                    type="number"
+                    placeholder="e.g., 74"
                     value={newRoute.distance}
                     onChange={(e) => setNewRoute({ ...newRoute, distance: e.target.value })}
                   />
@@ -386,8 +471,9 @@ const RouteManagement = () => {
 
                 {/* Avg Duration */}
                 <div>
-                  <label className="text-sm">Avg Duration</label>
+                  <label className="text-sm font-medium">Avg Duration *</label>
                   <Input
+                    placeholder="e.g., 1h 45m or 45 mins"
                     value={newRoute.avgDuration}
                     onChange={(e) => setNewRoute({ ...newRoute, avgDuration: e.target.value })}
                   />
@@ -395,8 +481,10 @@ const RouteManagement = () => {
 
                 {/* Daily Passengers */}
                 <div>
-                  <label className="text-sm">Daily Passengers</label>
+                  <label className="text-sm font-medium">Daily Passengers *</label>
                   <Input
+                    type="number"
+                    placeholder="e.g., 2400"
                     value={newRoute.dailyPassengers}
                     onChange={(e) =>
                       setNewRoute({ ...newRoute, dailyPassengers: e.target.value })
@@ -406,8 +494,10 @@ const RouteManagement = () => {
 
                 {/* Peak Occupancy */}
                 <div>
-                  <label className="text-sm">Peak Occupancy (%)</label>
+                  <label className="text-sm font-medium">Peak Occupancy (%) *</label>
                   <Input
+                    type="number"
+                    placeholder="e.g., 145"
                     value={newRoute.peakOccupancy}
                     onChange={(e) =>
                       setNewRoute({ ...newRoute, peakOccupancy: e.target.value })
@@ -417,7 +507,7 @@ const RouteManagement = () => {
 
                 {/* Status Dropdown */}
                 <div className="col-span-2">
-                  <label className="text-sm">Status</label>
+                  <label className="text-sm font-medium">Status (UI only)</label>
                   <Select
                     value={newRoute.status}
                     onValueChange={(v) => setNewRoute({ ...newRoute, status: v })}
@@ -459,11 +549,55 @@ const RouteManagement = () => {
 
         {/* ---------------- OVERVIEW TAB ---------------- */}
         <TabsContent value="overview">
+          
+          {/* Loading State */}
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground">Loading routes...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && (
+            <div className="flex items-center justify-center py-12">
+              <Card className="w-full max-w-md">
+                <CardContent className="pt-6">
+                  <div className="text-center space-y-4">
+                    <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+                    <div>
+                      <h3 className="font-semibold text-lg">Error Loading Routes</h3>
+                      <p className="text-muted-foreground text-sm mt-2">{error}</p>
+                    </div>
+                    <Button onClick={() => fetchRoutes()}>Retry</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Routes List */}
+          {!loading && !error && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* ROUTE LIST */}
             <div className="lg:col-span-2 space-y-4">
-              {filteredRoutes.map((route) => (
+              {filteredRoutes.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6 text-center py-12">
+                    <Route className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="font-semibold text-lg">No Routes Found</h3>
+                    <p className="text-muted-foreground text-sm mt-2">
+                      {routesList.length === 0 
+                        ? "Start by adding your first route" 
+                        : "No routes match your filters"}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredRoutes.map((route) => (
                 <Card
                   key={route.id}
                   className={`cursor-pointer transition-all ${
@@ -541,7 +675,7 @@ const RouteManagement = () => {
                     )}
                   </CardContent>
                 </Card>
-              ))}
+              )))}
             </div>
 
 
@@ -602,6 +736,7 @@ const RouteManagement = () => {
             </div>
 
           </div>
+          )}
         </TabsContent>
 
 
