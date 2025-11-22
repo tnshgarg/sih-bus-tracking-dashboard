@@ -15,6 +15,7 @@ import {
   Clock
 } from "lucide-react";
 
+
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
@@ -55,6 +56,13 @@ const Sidebar = () => {
       href: "/admin",
       icon: Shield,
       description: "System administration"
+    },
+    // ADD THIS ENTRY
+    {
+      name: "Consumer Buses",
+      href: "/consumer-buses",
+      icon: Bus,
+      description: "View & filter buses (public user)"
     }
   ];
 
