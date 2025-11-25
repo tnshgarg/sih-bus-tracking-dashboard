@@ -2,65 +2,30 @@ import Header from "@/components/Header";
 import StatsOverview from "@/components/StatsOverview";
 import MapView from "@/components/MapView";
 import BusCard from "@/components/BusCard";
+import { useQuery } from "@tanstack/react-query";
+import { getAllLiveBuses } from "@/api/app";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
-  // Mock data for Punjab bus routes
-  const mockBuses = [
-    {
-      busNumber: "PB-2501",
-      route: "Jalandhar → Amritsar (Golden Temple)",
-      currentOccupancy: 68,
-      maxCapacity: 80,
-      eta: "12 min",
-      status: "on-time" as const,
-      nextStop: "Kartarpur Corridor"
-    },
-    {
-      busNumber: "PB-1847",
-      route: "Ludhiana → Chandigarh",
-      currentOccupancy: 36,
-      maxCapacity: 80,
-      eta: "8 min",
-      status: "early" as const,
-      nextStop: "ISBT Sector-17"
-    },
-    {
-      busNumber: "PB-3921",
-      route: "Amritsar → Pathankot (Vaishno Devi)",
-      currentOccupancy: 76,
-      maxCapacity: 80,
-      eta: "15 min",
-      status: "delayed" as const,
-      nextStop: "Gurdaspur Junction"
-    },
-    {
-      busNumber: "CH-5623",
-      route: "Chandigarh → Patiala",
-      currentOccupancy: 49,
-      maxCapacity: 80,
-      eta: "5 min",
-      status: "on-time" as const,
-      nextStop: "Rajpura Bus Stand"
-    },
-    {
-      busNumber: "PB-7432",
-      route: "Patiala → Bathinda",
-      currentOccupancy: 72,
-      maxCapacity: 80,
-      eta: "18 min",
-      status: "on-time" as const,
-      nextStop: "Sangrur Market"
-    },
-    {
-      busNumber: "JL-9871",
-      route: "Jalandhar → Pathankot",
-      currentOccupancy: 28,
-      maxCapacity: 80,
-      eta: "7 min",
-      status: "early" as const,
-      nextStop: "Dasuya Bypass"
-    }
-  ];
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["liveBuses"],
+    queryFn: getAllLiveBuses,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
+  const buses = data?.buses || [];
+
+  // Transform API data to match BusCard props
+  const transformedBuses = buses.map((bus) => ({
+    busNumber: bus.bus_id,
+    route: bus.route_name || "Unknown Route",
+    currentOccupancy: Math.round(bus.passenger_load_pct),
+    maxCapacity: 100,
+    eta: bus.eta_minutes ? `${bus.eta_minutes} min` : "N/A",
+    status: (bus.load_category === "low" ? "on-time" : 
+             bus.load_category === "medium" ? "early" : "delayed") as "on-time" | "early" | "delayed",
+    nextStop: bus.next_stop || "Unknown"
+  }));
 
   return (
     <div className="space-y-6">
@@ -77,15 +42,37 @@ const Index = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">Live Bus Updates</h3>
           <div className="space-y-3 max-h-80 lg:max-h-96 overflow-y-auto pr-2">
-            {mockBuses.slice(0, 4).map((bus, index) => (
-              <BusCard key={index} {...bus} />
-            ))}
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-4 border rounded-lg">
+                  <Skeleton className="h-4 w-24 mb-2" />
+                  <Skeleton className="h-3 w-full mb-2" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              ))
+            ) : error ? (
+              <div className="p-4 border border-destructive rounded-lg">
+                <p className="text-sm text-destructive">
+                  Failed to load buses. Please ensure the API server is running.
+                </p>
+              </div>
+            ) : transformedBuses.length === 0 ? (
+              <div className="p-4 border rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  No active buses at the moment.
+                </p>
+              </div>
+            ) : (
+              transformedBuses.slice(0, 4).map((bus, index) => (
+                <BusCard key={index} {...bus} />
+              ))
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {mockBuses.slice(4).map((bus, index) => (
+        {!isLoading && !error && transformedBuses.slice(4).map((bus, index) => (
           <BusCard key={index + 4} {...bus} />
         ))}
       </div>

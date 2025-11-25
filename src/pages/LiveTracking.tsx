@@ -14,86 +14,48 @@ import {
   Zap,
   Bus
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getAllLiveBuses, getBusTrackingData } from "@/api/app";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const LiveTracking = () => {
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const liveBuses = [
-    {
-      id: "PB-2501",
-      route: "Jalandhar → Amritsar",
-      currentLocation: "Near Golden Temple",
-      occupancy: 85,
-      capacity: 80,
-      speed: 45,
-      eta: "12 min",
-      status: "on-time",
-      lat: 31.6340,
-      lng: 74.8723,
-      nextStops: ["Golden Temple", "Amritsar Bus Stand", "Ram Tirath"]
-    },
-    {
-      id: "PB-1847", 
-      route: "Ludhiana → Chandigarh",
-      currentLocation: "Rajpura Bypass",
-      occupancy: 45,
-      capacity: 80,
-      speed: 55,
-      eta: "8 min",
-      status: "early",
-      lat: 30.9010,
-      lng: 75.8573,
-      nextStops: ["ISBT Sector-17", "PGI Chandigarh", "Sector-43"]
-    },
-    {
-      id: "PB-3921",
-      route: "Amritsar → Pathankot", 
-      currentLocation: "Gurdaspur Junction",
-      occupancy: 95,
-      capacity: 80,
-      speed: 35,
-      eta: "15 min",
-      status: "delayed",
-      lat: 32.0367,
-      lng: 75.4056,
-      nextStops: ["Pathankot Cantt", "Pathankot Bus Stand"]
-    },
-    {
-      id: "CH-5623",
-      route: "Chandigarh → Patiala",
-      currentLocation: "Rajpura Market",
-      occupancy: 62,
-      capacity: 80,
-      speed: 50,
-      eta: "5 min",
-      status: "on-time",
-      lat: 30.7333,
-      lng: 76.7794,
-      nextStops: ["Patiala Bus Stand", "Sheran Wala Gate"]
-    }
-  ];
+  // Fetch all live buses
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["liveBuses"],
+    queryFn: getAllLiveBuses,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
 
-  const getOccupancyColor = (occupancy: number, capacity: number) => {
-    const percentage = (occupancy / capacity) * 100;
-    if (percentage < 70) return "success";
-    if (percentage < 90) return "warning";
+  // Fetch detailed tracking for selected bus
+  const { data: trackingData } = useQuery({
+    queryKey: ["busTracking", selectedBus],
+    queryFn: () => selectedBus ? getBusTrackingData(selectedBus) : null,
+    enabled: !!selectedBus,
+  });
+
+  const liveBuses = data?.buses || [];
+
+  const getOccupancyColor = (loadPct: number) => {
+    if (loadPct < 70) return "success";
+    if (loadPct < 90) return "warning";
     return "destructive";
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "on-time": return "success";
-      case "delayed": return "destructive";
-      case "early": return "default";
-      default: return "secondary";
+  const getStatusColor = (loadCategory: string) => {
+    switch (loadCategory) {
+      case "low": return "success";
+      case "high": return "destructive";
+      default: return "default";
     }
   };
 
   const filteredBuses = liveBuses.filter(bus => 
-    bus.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    bus.route.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    bus.currentLocation.toLowerCase().includes(searchQuery.toLowerCase())
+    bus.bus_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (bus.route_name && bus.route_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (bus.current_stop && bus.current_stop.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -146,51 +108,55 @@ const LiveTracking = () => {
               </div>
 
               {/* Bus Locations */}
-              {filteredBuses.map((bus, index) => (
+              {isLoading ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Skeleton className="h-12 w-32" />
+                </div>
+              ) : filteredBuses.map((bus, index) => (
                 <div
-                  key={bus.id}
+                  key={bus.bus_id}
                   className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10"
                   style={{
                     left: `${25 + index * 18}%`,
                     top: `${25 + (index % 2) * 30}%`,
                   }}
-                  onClick={() => setSelectedBus(selectedBus === bus.id ? null : bus.id)}
+                  onClick={() => setSelectedBus(selectedBus === bus.bus_id ? null : bus.bus_id)}
                 >
                   <div className={`
                     relative w-6 h-6 rounded-full border-2 border-white shadow-lg transition-all
-                    ${getOccupancyColor(bus.occupancy, bus.capacity) === 'success' ? 'bg-success' :
-                      getOccupancyColor(bus.occupancy, bus.capacity) === 'warning' ? 'bg-warning' : 'bg-destructive'}
-                    ${selectedBus === bus.id ? 'scale-125 ring-4 ring-primary/30' : 'hover:scale-110'}
+                    ${getOccupancyColor(bus.passenger_load_pct) === 'success' ? 'bg-success' :
+                      getOccupancyColor(bus.passenger_load_pct) === 'warning' ? 'bg-warning' : 'bg-destructive'}
+                    ${selectedBus === bus.bus_id ? 'scale-125 ring-4 ring-primary/30' : 'hover:scale-110'}
                   `}>
                     <Bus className="w-4 h-4 text-white absolute top-1 left-1" />
                     
                     {/* Speed indicator */}
                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
                       <span className="text-xs text-primary-foreground font-bold">
-                        {Math.round(bus.speed / 10)}
+                        {bus.speed_kmph ? Math.round(bus.speed_kmph / 10) : 0}
                       </span>
                     </div>
                   </div>
                   
                   {/* Enhanced Tooltip */}
-                  {selectedBus === bus.id && (
+                  {selectedBus === bus.bus_id && (
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 z-20">
                       <div className="bg-card border border-border rounded-lg p-4 shadow-xl min-w-64">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold">{bus.id}</span>
-                          <Badge variant={getStatusColor(bus.status) as any}>
-                            {bus.status}
+                          <span className="font-semibold">{bus.bus_id}</span>
+                          <Badge variant={getStatusColor(bus.load_category) as any}>
+                            {bus.load_category}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-3">{bus.route}</p>
+                        <p className="text-sm text-muted-foreground mb-3">{bus.route_name || 'Unknown Route'}</p>
                         
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="flex items-center space-x-1">
                               <Users className="h-3 w-3" />
-                              <span>Occupancy</span>
+                              <span>Load</span>
                             </span>
-                            <span className="font-medium">{bus.occupancy}/{bus.capacity}</span>
+                            <span className="font-medium">{Math.round(bus.passenger_load_pct)}%</span>
                           </div>
                           
                           <div className="flex items-center justify-between text-sm">
@@ -198,7 +164,7 @@ const LiveTracking = () => {
                               <Zap className="h-3 w-3" />
                               <span>Speed</span>
                             </span>
-                            <span className="font-medium">{bus.speed} km/h</span>
+                            <span className="font-medium">{bus.speed_kmph || 0} km/h</span>
                           </div>
                           
                           <div className="flex items-center justify-between text-sm">
@@ -206,7 +172,7 @@ const LiveTracking = () => {
                               <Clock className="h-3 w-3" />
                               <span>ETA</span>
                             </span>
-                            <span className="font-medium">{bus.eta}</span>
+                            <span className="font-medium">{bus.eta_minutes ? `${bus.eta_minutes} min` : 'N/A'}</span>
                           </div>
                         </div>
                       </div>
@@ -251,34 +217,50 @@ const LiveTracking = () => {
               <CardTitle className="text-lg">Live Bus Feed</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-              {filteredBuses.map((bus) => (
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="p-3 rounded-lg border">
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-3 w-full mb-2" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                ))
+              ) : error ? (
+                <div className="p-4 text-center text-sm text-destructive">
+                  Failed to load buses
+                </div>
+              ) : filteredBuses.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No buses found
+                </div>
+              ) : filteredBuses.map((bus) => (
                 <div
-                  key={bus.id}
+                  key={bus.bus_id}
                   className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                    selectedBus === bus.id 
+                    selectedBus === bus.bus_id 
                       ? 'border-primary bg-primary/5' 
                       : 'border-border hover:border-primary/50'
                   }`}
-                  onClick={() => setSelectedBus(selectedBus === bus.id ? null : bus.id)}
+                  onClick={() => setSelectedBus(selectedBus === bus.bus_id ? null : bus.bus_id)}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-sm">{bus.id}</span>
+                    <span className="font-semibold text-sm">{bus.bus_id}</span>
                     <div className="flex items-center space-x-1">
                       <Badge 
-                        variant={getOccupancyColor(bus.occupancy, bus.capacity) as any}
+                        variant={getOccupancyColor(bus.passenger_load_pct) as any}
                         className="text-xs"
                       >
-                        {Math.round((bus.occupancy / bus.capacity) * 100)}%
+                        {Math.round(bus.passenger_load_pct)}%
                       </Badge>
                     </div>
                   </div>
                   
-                  <p className="text-xs text-muted-foreground mb-2">{bus.route}</p>
-                  <p className="text-xs text-foreground mb-2">📍 {bus.currentLocation}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{bus.route_name || 'Unknown Route'}</p>
+                  <p className="text-xs text-foreground mb-2">📍 {bus.current_stop || 'Unknown Location'}</p>
                   
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Next in {bus.eta}</span>
-                    {bus.occupancy > bus.capacity && (
+                    <span className="text-muted-foreground">Next in {bus.eta_minutes ? `${bus.eta_minutes} min` : 'N/A'}</span>
+                    {bus.passenger_load_pct > 90 && (
                       <div className="flex items-center space-x-1 text-destructive">
                         <AlertTriangle className="h-3 w-3" />
                         <span>Overcrowded</span>
@@ -290,32 +272,35 @@ const LiveTracking = () => {
             </CardContent>
           </Card>
 
-          {selectedBus && (
+          {selectedBus && trackingData && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Next Stops</CardTitle>
+                <CardTitle className="text-lg">Stop Timeline</CardTitle>
               </CardHeader>
               <CardContent>
-                {(() => {
-                  const bus = liveBuses.find(b => b.id === selectedBus);
-                  return bus?.nextStops.map((stop, index) => (
-                    <div key={index} className="flex items-center space-x-3 py-2">
-                      <div className={`w-2 h-2 rounded-full ${
-                        index === 0 ? 'bg-primary' : 'bg-muted-foreground/30'
-                      }`} />
-                      <span className={`text-sm ${
-                        index === 0 ? 'font-medium text-foreground' : 'text-muted-foreground'
-                      }`}>
-                        {stop}
+                {trackingData.stop_timeline.map((stop, index) => (
+                  <div key={index} className="flex items-center space-x-3 py-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      stop.status === 'current' ? 'bg-primary' : 
+                      stop.status === 'passed' ? 'bg-success' : 'bg-muted-foreground/30'
+                    }`} />
+                    <span className={`text-sm ${
+                      stop.status === 'current' ? 'font-medium text-foreground' : 'text-muted-foreground'
+                    }`}>
+                      {stop.name}
+                    </span>
+                    {stop.status === 'current' && (
+                      <Badge variant="secondary" className="ml-auto">
+                        Current
+                      </Badge>
+                    )}
+                    {stop.status === 'upcoming' && stop.eta_minutes && (
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {stop.eta_minutes} min
                       </span>
-                      {index === 0 && (
-                        <Badge variant="secondary" className="ml-auto">
-                          Next
-                        </Badge>
-                      )}
-                    </div>
-                  ));
-                })()}
+                    )}
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}

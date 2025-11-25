@@ -8,8 +8,6 @@ import Index from "./pages/Index";
 import LiveTracking from "./pages/LiveTracking";
 import RouteManagement from "./pages/RouteManagement";
 import Analytics from "./pages/Analytics";
-import PassengerPortal from "./pages/PassengerPortal";
-import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import BusConsumerPage from "./pages/BusConsumerPage";
 
@@ -36,11 +34,7 @@ const App = () => (
           <Route path="/tracking" element={<Layout><LiveTracking /></Layout>} />
           <Route path="/routes" element={<Layout><RouteManagement /></Layout>} />
           <Route path="/consumer-buses" element={<BusConsumerPage />} />
-
           <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-          <Route path="/passenger" element={<Layout><PassengerPortal /></Layout>} />
-
-          <Route path="/admin" element={<Layout><AdminPanel /></Layout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

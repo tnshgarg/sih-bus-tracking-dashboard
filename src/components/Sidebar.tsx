@@ -6,12 +6,9 @@ import {
   Bus, 
   MapPin, 
   BarChart3, 
-  Users, 
-  Settings,
   Menu,
   X,
   Route,
-  Shield,
   Clock
 } from "lucide-react";
 
@@ -45,19 +42,6 @@ const Sidebar = () => {
       icon: BarChart3,
       description: "Insights & predictions"
     },
-    {
-      name: "Passenger Portal",
-      href: "/passenger",
-      icon: Users,
-      description: "Public commuter interface"
-    },
-    {
-      name: "Admin Panel",
-      href: "/admin",
-      icon: Shield,
-      description: "System administration"
-    },
-    // ADD THIS ENTRY
     {
       name: "Consumer Buses",
       href: "/consumer-buses",
