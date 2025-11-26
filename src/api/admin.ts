@@ -4,6 +4,10 @@ import type {
   Route,
   RevenueAnalytics,
   DeviceHealth,
+  TicketAnalytics,
+  FleetBus,
+  FleetDriver,
+  FleetConductor,
 } from "./types";
 
 /**
@@ -78,6 +82,89 @@ export async function getDeviceHealth(): Promise<{
 
   if (!response.ok) {
     throw new Error(`Failed to fetch device health: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get ticket analytics with filters
+ */
+export async function getTicketAnalytics(filters: {
+  boarding_stop?: string;
+  destination_stop?: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<TicketAnalytics> {
+  const params = new URLSearchParams();
+  if (filters.boarding_stop) params.append("boarding_stop", filters.boarding_stop);
+  if (filters.destination_stop) params.append("destination_stop", filters.destination_stop);
+  if (filters.start_date) params.append("start_date", filters.start_date);
+  if (filters.end_date) params.append("end_date", filters.end_date);
+
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.ANALYTICS_TICKETS}?${params.toString()}`,
+    {
+      headers: createHeaders(true),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ticket analytics: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get all fleet buses
+ */
+export async function getFleetBuses(): Promise<FleetBus[]> {
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.FLEET_BUSES}`,
+    {
+      headers: createHeaders(true),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch fleet buses: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get all fleet drivers
+ */
+export async function getFleetDrivers(): Promise<FleetDriver[]> {
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.FLEET_DRIVERS}`,
+    {
+      headers: createHeaders(true),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch fleet drivers: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get all fleet conductors
+ */
+export async function getFleetConductors(): Promise<FleetConductor[]> {
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.FLEET_CONDUCTORS}`,
+    {
+      headers: createHeaders(true),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch fleet conductors: ${response.statusText}`);
   }
 
   return response.json();

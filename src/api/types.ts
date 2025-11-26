@@ -24,6 +24,11 @@ export interface Route {
   fare_per_km: number;
   status?: string;
   stops: RouteStop[];
+  // Analytics fields
+  daily_passengers?: number;
+  peak_occupancy?: number;
+  avg_duration?: string;
+  distance_km?: number;
 }
 
 export interface LiveBus {
@@ -85,6 +90,60 @@ export interface DeviceHealth {
   status: string;
   last_seen: string | null;
   offline: boolean;
+}
+
+
+export interface TicketAnalytics {
+  search_criteria: {
+    boarding_stop?: string;
+    destination_stop?: string;
+    start_date?: string;
+    end_date?: string;
+  };
+  combined_totals: {
+    total_buses: number;
+    total_trips: number;
+    total_tickets: number;
+    total_revenue: number;
+    unique_seats_occupied: number;
+    avg_fare: number;
+  };
+  buses: Array<{
+    bus_id: string;
+    route_id: string;
+    total_trips: number;
+    total_tickets: number;
+    total_revenue: number;
+    seats_occupied: number;
+    avg_fare: number;
+    tickets: any[];
+  }>;
+}
+
+export interface FleetBus {
+  bus_id: string;
+  status: string;
+  last_seen: string | null;
+  capacity: number;
+  type: string;
+}
+
+export interface FleetDriver {
+  driver_id: string;
+  name: string;
+  status: string;
+  current_bus: string | null;
+  license_no: string;
+  phone: string;
+}
+
+export interface FleetConductor {
+  conductor_id: string;
+  name: string;
+  status: string;
+  current_bus: string | null;
+  license_no: string;
+  phone: string;
 }
 
 export interface ApiError {

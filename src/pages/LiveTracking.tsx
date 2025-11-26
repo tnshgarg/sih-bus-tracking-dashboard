@@ -1,22 +1,23 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { 
-  MapPin, 
   Search, 
   Filter, 
-  Navigation, 
   Users, 
   Clock,
   AlertTriangle,
   Zap,
-  Bus
+  Bus,
+  ArrowRight,
+  MapPin
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getAllLiveBuses, getBusTrackingData } from "@/api/app";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const LiveTracking = () => {
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
@@ -38,6 +39,19 @@ const LiveTracking = () => {
 
   const liveBuses = data?.buses || [];
 
+  // Group buses by route
+  const busesByRoute = useMemo(() => {
+    const grouped: Record<string, typeof liveBuses> = {};
+    liveBuses.forEach(bus => {
+      const routeName = bus.route_name || "Unknown Route";
+      if (!grouped[routeName]) {
+        grouped[routeName] = [];
+      }
+      grouped[routeName].push(bus);
+    });
+    return grouped;
+  }, [liveBuses]);
+
   const getOccupancyColor = (loadPct: number) => {
     if (loadPct < 70) return "success";
     if (loadPct < 90) return "warning";
@@ -52,18 +66,18 @@ const LiveTracking = () => {
     }
   };
 
-  const filteredBuses = liveBuses.filter(bus => 
-    bus.bus_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (bus.route_name && bus.route_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (bus.current_stop && bus.current_stop.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredRoutes = Object.entries(busesByRoute).filter(([routeName, buses]) => {
+    const matchesSearch = routeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      buses.some(bus => bus.bus_id.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Live Bus Tracking</h1>
-          <p className="text-muted-foreground">Real-time monitoring of all active buses</p>
+          <p className="text-muted-foreground">Real-time monitoring of active routes and buses</p>
         </div>
         <div className="flex gap-2">
           <div className="relative">
@@ -82,225 +96,206 @@ const LiveTracking = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Live Map */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              <span>Live Map View</span>
-              <Badge variant="secondary" className="ml-auto">
-                {liveBuses.length} Active Buses
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative bg-muted rounded-lg h-96 overflow-hidden">
-              {/* Enhanced Mock Map */}
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-primary/10"></div>
-              
-              {/* Map Grid */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="grid grid-cols-12 grid-rows-8 h-full w-full">
-                  {Array.from({ length: 96 }).map((_, i) => (
-                    <div key={i} className="border border-muted-foreground/20"></div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bus Locations */}
-              {isLoading ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Skeleton className="h-12 w-32" />
-                </div>
-              ) : filteredBuses.map((bus, index) => (
-                <div
-                  key={bus.bus_id}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10"
-                  style={{
-                    left: `${25 + index * 18}%`,
-                    top: `${25 + (index % 2) * 30}%`,
-                  }}
-                  onClick={() => setSelectedBus(selectedBus === bus.bus_id ? null : bus.bus_id)}
-                >
-                  <div className={`
-                    relative w-6 h-6 rounded-full border-2 border-white shadow-lg transition-all
-                    ${getOccupancyColor(bus.passenger_load_pct) === 'success' ? 'bg-success' :
-                      getOccupancyColor(bus.passenger_load_pct) === 'warning' ? 'bg-warning' : 'bg-destructive'}
-                    ${selectedBus === bus.bus_id ? 'scale-125 ring-4 ring-primary/30' : 'hover:scale-110'}
-                  `}>
-                    <Bus className="w-4 h-4 text-white absolute top-1 left-1" />
-                    
-                    {/* Speed indicator */}
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-xs text-primary-foreground font-bold">
-                        {bus.speed_kmph ? Math.round(bus.speed_kmph / 10) : 0}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Enhanced Tooltip */}
-                  {selectedBus === bus.bus_id && (
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 z-20">
-                      <div className="bg-card border border-border rounded-lg p-4 shadow-xl min-w-64">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold">{bus.bus_id}</span>
-                          <Badge variant={getStatusColor(bus.load_category) as any}>
-                            {bus.load_category}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">{bus.route_name || 'Unknown Route'}</p>
-                        
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="flex items-center space-x-1">
-                              <Users className="h-3 w-3" />
-                              <span>Load</span>
-                            </span>
-                            <span className="font-medium">{Math.round(bus.passenger_load_pct)}%</span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="flex items-center space-x-1">
-                              <Zap className="h-3 w-3" />
-                              <span>Speed</span>
-                            </span>
-                            <span className="font-medium">{bus.speed_kmph || 0} km/h</span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3" />
-                              <span>ETA</span>
-                            </span>
-                            <span className="font-medium">{bus.eta_minutes ? `${bus.eta_minutes} min` : 'N/A'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Route Lines */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                <defs>
-                  <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6"/>
-                    <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity="0.6"/>
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 25% 25% Q 45% 15% 61% 25% Q 75% 35% 79% 55%"
-                  stroke="url(#routeGradient)"
-                  strokeWidth="3"
-                  strokeDasharray="8,4"
-                  fill="none"
-                  className="animate-pulse"
-                />
-              </svg>
-
-              {/* Map Controls */}
-              <div className="absolute top-4 right-4 space-y-2">
-                <Button size="sm" variant="secondary">
-                  <Navigation className="h-4 w-4 mr-1" />
-                  Center
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bus Details Panel */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Live Bus Feed</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-              {isLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="p-3 rounded-lg border">
-                    <Skeleton className="h-4 w-24 mb-2" />
-                    <Skeleton className="h-3 w-full mb-2" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                ))
-              ) : error ? (
-                <div className="p-4 text-center text-sm text-destructive">
-                  Failed to load buses
-                </div>
-              ) : filteredBuses.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No buses found
-                </div>
-              ) : filteredBuses.map((bus) => (
-                <div
-                  key={bus.bus_id}
-                  className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                    selectedBus === bus.bus_id 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => setSelectedBus(selectedBus === bus.bus_id ? null : bus.bus_id)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-sm">{bus.bus_id}</span>
-                    <div className="flex items-center space-x-1">
-                      <Badge 
-                        variant={getOccupancyColor(bus.passenger_load_pct) as any}
-                        className="text-xs"
-                      >
-                        {Math.round(bus.passenger_load_pct)}%
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <p className="text-xs text-muted-foreground mb-2">{bus.route_name || 'Unknown Route'}</p>
-                  <p className="text-xs text-foreground mb-2">📍 {bus.current_stop || 'Unknown Location'}</p>
-                  
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Next in {bus.eta_minutes ? `${bus.eta_minutes} min` : 'N/A'}</span>
-                    {bus.passenger_load_pct > 90 && (
-                      <div className="flex items-center space-x-1 text-destructive">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>Overcrowded</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {selectedBus && trackingData && (
+        {/* Linear Route View */}
+        <div className="lg:col-span-2 space-y-6">
+          {isLoading ? (
+             Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+                <CardContent><Skeleton className="h-24 w-full" /></CardContent>
+              </Card>
+             ))
+          ) : filteredRoutes.length === 0 ? (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Stop Timeline</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {trackingData.stop_timeline.map((stop, index) => (
-                  <div key={index} className="flex items-center space-x-3 py-2">
-                    <div className={`w-2 h-2 rounded-full ${
-                      stop.status === 'current' ? 'bg-primary' : 
-                      stop.status === 'passed' ? 'bg-success' : 'bg-muted-foreground/30'
-                    }`} />
-                    <span className={`text-sm ${
-                      stop.status === 'current' ? 'font-medium text-foreground' : 'text-muted-foreground'
-                    }`}>
-                      {stop.name}
-                    </span>
-                    {stop.status === 'current' && (
-                      <Badge variant="secondary" className="ml-auto">
-                        Current
-                      </Badge>
-                    )}
-                    {stop.status === 'upcoming' && stop.eta_minutes && (
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {stop.eta_minutes} min
-                      </span>
-                    )}
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Bus className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No active routes found matching your search.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredRoutes.map(([routeName, buses]) => (
+              <Card key={routeName} className="overflow-hidden">
+                <CardHeader className="bg-muted/30 pb-3">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Bus className="h-5 w-5 text-primary" />
+                      {routeName}
+                    </CardTitle>
+                    <Badge variant="outline">{buses.length} Active Buses</Badge>
                   </div>
-                ))}
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {/* Linear Visualization */}
+                  <div className="relative py-8 px-4">
+                    {/* Route Line */}
+                    <div className="absolute top-1/2 left-0 right-0 h-1 bg-muted-foreground/20 -translate-y-1/2 rounded-full"></div>
+                    
+                    {/* Start/End Points */}
+                    <div className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center">
+                      <div className="w-3 h-3 rounded-full bg-muted-foreground"></div>
+                      <span className="text-xs text-muted-foreground mt-2 whitespace-nowrap">Start</span>
+                    </div>
+                    <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 flex flex-col items-center">
+                      <div className="w-3 h-3 rounded-full bg-muted-foreground"></div>
+                      <span className="text-xs text-muted-foreground mt-2 whitespace-nowrap">End</span>
+                    </div>
+
+                    {/* Buses on the line */}
+                    {buses.map((bus, idx) => {
+                      // Calculate approximate position based on some metric (e.g., stop index or just spread them out for now if we don't have exact progress)
+                      // Since we don't have exact progress % from API yet, we'll distribute them or use a random position for demo if needed.
+                      // Ideally, backend should send progress percentage.
+                      // For now, let's hash the bus ID to get a consistent position between 10% and 90%
+                      const position = 10 + (parseInt(bus.bus_id.replace(/\D/g, '')) % 80); 
+                      
+                      return (
+                        <div 
+                          key={bus.bus_id}
+                          className="absolute top-1/2 -translate-y-1/2 transform transition-all duration-500 hover:z-10"
+                          style={{ left: `${position}%` }}
+                        >
+                          <div 
+                            className={`
+                              cursor-pointer flex flex-col items-center group
+                              ${selectedBus === bus.bus_id ? 'scale-110 z-20' : 'hover:scale-110'}
+                            `}
+                            onClick={() => setSelectedBus(selectedBus === bus.bus_id ? null : bus.bus_id)}
+                          >
+                            <div className={`
+                              w-8 h-8 rounded-full flex items-center justify-center shadow-md border-2 border-white
+                              ${getOccupancyColor(bus.passenger_load_pct) === 'success' ? 'bg-green-500' : 
+                                getOccupancyColor(bus.passenger_load_pct) === 'warning' ? 'bg-yellow-500' : 'bg-red-500'}
+                            `}>
+                              <Bus className="h-4 w-4 text-white" />
+                            </div>
+                            
+                            {/* Tooltip-like info */}
+                            <div className={`
+                              absolute bottom-full mb-2 bg-popover text-popover-foreground text-xs p-2 rounded shadow-lg border whitespace-nowrap
+                              ${selectedBus === bus.bus_id ? 'block' : 'hidden group-hover:block'}
+                            `}>
+                              <div className="font-bold">{bus.bus_id}</div>
+                              <div>Load: {Math.round(bus.passenger_load_pct)}%</div>
+                              <div>Speed: {bus.speed_kmph} km/h</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* List of buses on this route */}
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {buses.map(bus => (
+                      <div 
+                        key={bus.bus_id} 
+                        className={`
+                          flex items-center justify-between p-3 rounded-lg border text-sm cursor-pointer transition-colors
+                          ${selectedBus === bus.bus_id ? 'border-primary bg-primary/5' : 'hover:bg-accent'}
+                        `}
+                        onClick={() => setSelectedBus(selectedBus === bus.bus_id ? null : bus.bus_id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline">{bus.bus_id}</Badge>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{bus.current_stop}</span>
+                            <span className="text-xs text-muted-foreground">Next: {bus.next_stop}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-bold ${
+                            getOccupancyColor(bus.passenger_load_pct) === 'success' ? 'text-green-600' : 
+                            getOccupancyColor(bus.passenger_load_pct) === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {Math.round(bus.passenger_load_pct)}% Load
+                          </div>
+                          <div className="text-xs text-muted-foreground">{bus.eta_minutes} min away</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Sidebar Details Panel */}
+        <div className="space-y-4">
+          {selectedBus ? (
+            trackingData ? (
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Bus Details</span>
+                    <Badge variant="secondary">{selectedBus}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                   {/* Status Cards */}
+                   <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-muted/50 rounded-lg text-center">
+                        <Users className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                        <div className="text-lg font-bold">{Math.round(trackingData.passenger_load_pct)}%</div>
+                        <div className="text-xs text-muted-foreground">Occupancy</div>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg text-center">
+                        <Zap className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                        <div className="text-lg font-bold">{trackingData.current_location.speed_kmph}</div>
+                        <div className="text-xs text-muted-foreground">km/h</div>
+                      </div>
+                   </div>
+
+                   {/* Timeline */}
+                   <div>
+                     <h3 className="font-semibold mb-3 flex items-center gap-2">
+                       <Clock className="h-4 w-4" /> Stop Timeline
+                     </h3>
+                     <ScrollArea className="h-[300px] pr-4">
+                       <div className="relative border-l-2 border-muted ml-2 space-y-6 py-2">
+                         {trackingData.stop_timeline.map((stop, idx) => (
+                           <div key={idx} className="relative pl-6">
+                             <div className={`
+                               absolute left-[-5px] top-1 w-3 h-3 rounded-full border-2 border-background
+                               ${stop.status === 'passed' ? 'bg-green-500' : 
+                                 stop.status === 'current' ? 'bg-blue-500 scale-125' : 'bg-muted-foreground'}
+                             `}></div>
+                             <div className="flex justify-between items-start">
+                               <div>
+                                 <div className={`font-medium ${stop.status === 'current' ? 'text-primary' : ''}`}>
+                                   {stop.name}
+                                 </div>
+                                 <div className="text-xs text-muted-foreground">
+                                   {stop.status === 'passed' ? 'Departed' : 
+                                    stop.status === 'current' ? 'At Stop' : 'Upcoming'}
+                                 </div>
+                               </div>
+                               {stop.eta_minutes && (
+                                 <Badge variant="outline" className="text-xs">
+                                   {stop.eta_minutes} min
+                                 </Badge>
+                               )}
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     </ScrollArea>
+                   </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p>Loading details...</p>
+                </CardContent>
+              </Card>
+            )
+          ) : (
+            <Card className="bg-muted/30 border-dashed">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Select a bus to view detailed tracking info</p>
               </CardContent>
             </Card>
           )}

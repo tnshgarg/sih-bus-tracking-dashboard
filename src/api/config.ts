@@ -12,7 +12,11 @@ export const ENDPOINTS = {
     ROUTES: "/admin/v1/routes",
     ANALYTICS_REALTIME: "/admin/v1/analytics/realtime",
     ANALYTICS_REVENUE: "/admin/v1/analytics/revenue",
+    ANALYTICS_TICKETS: "/admin/v1/analytics/tickets",
     DEVICE_HEALTH: "/admin/v1/device-health",
+    FLEET_BUSES: "/admin/v1/fleet/buses",
+    FLEET_DRIVERS: "/admin/v1/fleet/drivers",
+    FLEET_CONDUCTORS: "/admin/v1/fleet/conductors",
   },
   // App endpoints
   APP: {

@@ -35,9 +35,11 @@ import {
 } from "@/components/ui/dialog";
 
 
+import { API_CONFIG, ENDPOINTS } from "@/api/config";
+
 // ---------------- API BASE URL ----------------
-const API_BASE_URL = "http://localhost:3000/etm/v1";
-const AUTH_TOKEN = "Bearer sk-test-1234567890";
+const API_BASE_URL = API_CONFIG.BASE_URL;
+const AUTH_TOKEN = `Bearer ${API_CONFIG.ADMIN_TOKEN}`;
 
 
 // ---------------- SCHEDULE DATA ----------------

@@ -43,10 +43,10 @@ const Sidebar = () => {
       description: "Insights & predictions"
     },
     {
-      name: "Consumer Buses",
-      href: "/consumer-buses",
+      name: "Fleet Management",
+      href: "/fleet",
       icon: Bus,
-      description: "View & filter buses (public user)"
+      description: "Manage buses, drivers & conductors"
     }
   ];
 

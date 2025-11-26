@@ -9,7 +9,7 @@ import LiveTracking from "./pages/LiveTracking";
 import RouteManagement from "./pages/RouteManagement";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
-import BusConsumerPage from "./pages/BusConsumerPage";
+import FleetManagement from "./pages/FleetManagement";
 
 
 const queryClient = new QueryClient();
@@ -17,7 +17,7 @@ const queryClient = new QueryClient();
 const Layout = ({ children }: { children: React.ReactNode }) => (
   <div className="flex min-h-screen bg-background">
     <Sidebar />
-    <main className="flex-1 lg:ml-72 p-6">
+    <main className="flex-1 p-6">
       {children}
     </main>
   </div>
@@ -33,7 +33,7 @@ const App = () => (
           <Route path="/" element={<Layout><Index /></Layout>} />
           <Route path="/tracking" element={<Layout><LiveTracking /></Layout>} />
           <Route path="/routes" element={<Layout><RouteManagement /></Layout>} />
-          <Route path="/consumer-buses" element={<BusConsumerPage />} />
+          <Route path="/fleet" element={<Layout><FleetManagement /></Layout>} />
           <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -37,7 +37,13 @@ const Index = () => {
       <StatsOverview />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <MapView />
+        {/* Map View Removed as per request */}
+        <div className="lg:col-span-2 space-y-4">
+           {/* Placeholder for future content if needed, or just let the list take more space */}
+           <div className="p-6 border rounded-lg bg-muted/20 text-center">
+              <p className="text-muted-foreground">Map view is disabled. Please check Live Tracking for detailed bus status.</p>
+           </div>
+        </div>
         
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">Live Bus Updates</h3>
