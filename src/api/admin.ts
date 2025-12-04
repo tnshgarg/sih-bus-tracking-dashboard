@@ -169,3 +169,65 @@ export async function getFleetConductors(): Promise<FleetConductor[]> {
 
   return response.json();
 }
+/**
+ * Get all live buses for map
+ */
+export async function getLiveBuses(): Promise<any[]> {
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.BUSES_LIVE}`,
+    {
+      headers: createHeaders(true),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch live buses: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * Get route performance analytics
+ */
+export async function getRoutePerformance(): Promise<any[]> {
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.ANALYTICS_ROUTE_PERFORMANCE}`,
+    {
+      headers: createHeaders(true),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch route performance: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+
+/**
+ * Create a new conductor
+ */
+export async function createConductor(data: {
+  conductorId: string;
+  name: string;
+  password: string;
+  licenseNo: string;
+  phone: string;
+}): Promise<any> {
+  const response = await fetch(
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.FLEET_CONDUCTORS}`,
+    {
+      method: "POST",
+      headers: createHeaders(true),
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || `Failed to create conductor: ${response.statusText}`);
+  }
+
+  return response.json();
+}

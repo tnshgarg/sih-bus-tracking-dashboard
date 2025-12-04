@@ -22,8 +22,24 @@ import { useQuery } from "@tanstack/react-query";
 import { getFleetBuses, getFleetDrivers, getFleetConductors } from "@/api/admin";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import CreateConductorModal from "@/components/CreateConductorModal";
+import CreateBusModal from "@/components/CreateBusModal";
+import EditBusModal from "@/components/EditBusModal";
+import CreateDriverModal from "@/components/CreateDriverModal";
+import EditDriverModal from "@/components/EditDriverModal";
+import EditConductorModal from "@/components/EditConductorModal";
+
 const FleetManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateConductorOpen, setIsCreateConductorOpen] = useState(false);
+  const [isCreateBusOpen, setIsCreateBusOpen] = useState(false);
+  const [isEditBusOpen, setIsEditBusOpen] = useState(false);
+  const [selectedBus, setSelectedBus] = useState<any>(null);
+  const [isCreateDriverOpen, setIsCreateDriverOpen] = useState(false);
+  const [isEditDriverOpen, setIsEditDriverOpen] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState<any>(null);
+  const [isEditConductorOpen, setIsEditConductorOpen] = useState(false);
+  const [selectedConductor, setSelectedConductor] = useState<any>(null);
 
   // Fetch Fleet Data
   const { data: buses, isLoading: isLoadingBuses } = useQuery({
@@ -70,12 +86,27 @@ const FleetManagement = () => {
           <p className="text-muted-foreground">Manage buses, drivers, and conductors</p>
         </div>
         <div className="flex gap-2">
-          <Button>
+          <Button onClick={() => setIsCreateBusOpen(true)} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
-            Add Resource
+            Add Bus
+          </Button>
+          <Button onClick={() => setIsCreateDriverOpen(true)} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Driver
+          </Button>
+          <Button onClick={() => setIsCreateConductorOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Conductor
           </Button>
         </div>
       </div>
+
+      <CreateBusModal isOpen={isCreateBusOpen} onClose={() => setIsCreateBusOpen(false)} />
+      <EditBusModal isOpen={isEditBusOpen} onClose={() => setIsEditBusOpen(false)} bus={selectedBus} />
+      <CreateDriverModal isOpen={isCreateDriverOpen} onClose={() => setIsCreateDriverOpen(false)} />
+      <EditDriverModal isOpen={isEditDriverOpen} onClose={() => setIsEditDriverOpen(false)} driver={selectedDriver} />
+      <CreateConductorModal isOpen={isCreateConductorOpen} onClose={() => setIsCreateConductorOpen(false)} />
+      <EditConductorModal isOpen={isEditConductorOpen} onClose={() => setIsEditConductorOpen(false)} conductor={selectedConductor} />
 
       <div className="flex items-center space-x-2 bg-background p-1 rounded-lg border w-full max-w-md">
         <Search className="h-4 w-4 text-muted-foreground ml-2" />
@@ -154,13 +185,24 @@ const FleetManagement = () => {
                           <span>Capacity</span>
                           <span className="text-foreground font-medium">{bus.capacity} Seats</span>
                         </div>
-                        <div className="flex justify-between text-muted-foreground">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                           <span>Last Seen</span>
                           <span className="text-foreground font-medium">
                             {bus.last_seen ? new Date(bus.last_seen).toLocaleString() : 'Never'}
                           </span>
                         </div>
                       </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-3 w-full"
+                        onClick={() => {
+                          setSelectedBus(bus);
+                          setIsEditBusOpen(true);
+                        }}
+                      >
+                        Edit Bus
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -228,6 +270,17 @@ const FleetManagement = () => {
                           </div>
                         )}
                       </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-3 w-full"
+                        onClick={() => {
+                          setSelectedDriver(driver);
+                          setIsEditDriverOpen(true);
+                        }}
+                      >
+                        Edit Driver
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -295,6 +348,17 @@ const FleetManagement = () => {
                           </div>
                         )}
                       </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-3 w-full"
+                        onClick={() => {
+                          setSelectedConductor(conductor);
+                          setIsEditConductorOpen(true);
+                        }}
+                      >
+                        Edit Conductor
+                      </Button>
                     </div>
                   ))}
                 </div>

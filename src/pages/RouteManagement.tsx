@@ -34,21 +34,16 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 
-
-import { API_CONFIG, ENDPOINTS } from "@/api/config";
-
-// ---------------- API BASE URL ----------------
-const API_BASE_URL = API_CONFIG.BASE_URL;
-const AUTH_TOKEN = `Bearer ${API_CONFIG.ADMIN_TOKEN}`;
+import { API_CONFIG, ENDPOINTS, createHeaders } from "@/api/config";
+import { StopsBuilder } from "@/components/StopsBuilder";
 
 
-// ---------------- SCHEDULE DATA ----------------
-const scheduleData = [
-  { time: "05:00", buses: 2, occupancy: 45 },
-  { time: "06:00", buses: 4, occupancy: 75 },
-  { time: "07:00", buses: 6, occupancy: 95 },
-  { time: "08:00", buses: 8, occupancy: 125 },
-];
+// Stop type for stops builder
+interface Stop {
+  id: string;
+  name: string;
+  sequence: number;
+}
 
 
 // =====================================================================
@@ -66,13 +61,15 @@ const RouteManagement = () => {
     name: "",
     startPoint: "",
     endPoint: "",
-    stops: "",
     distance: "",
     avgDuration: "",
     dailyPassengers: "",
     peakOccupancy: "",
     status: "optimal"
   });
+  
+  // Separate state for stops (now an array of Stop objects)
+  const [routeStops, setRouteStops] = useState<Stop[]>([]);
 
   // -------------------------------------------------------
   //        FILTER STATES (fully added & integrated)
@@ -156,13 +153,11 @@ const RouteManagement = () => {
         params.append("search", filters.search);
       }
       
-      const url = `${API_BASE_URL}/routes${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.ROUTES}${params.toString() ? `?${params.toString()}` : ''}`;
       
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          "Authorization": AUTH_TOKEN,
-        },
+        headers: createHeaders(true),
       });
 
       if (!response.ok) {
@@ -173,18 +168,23 @@ const RouteManagement = () => {
       
       // Map backend response to frontend format
       const formattedRoutes = data.routes.map((route: any) => ({
-        id: `R-${String(route.id).padStart(3, "0")}`,
-        name: route.name,
-        startPoint: route.start_point,
-        endPoint: route.end_point,
-        stops: Array.isArray(route.stops) ? route.stops.join(", ") : route.stops,
-        distance: String(route.distance_km),
-        avgDuration: route.avg_duration,
-        dailyPassengers: route.daily_passengers,
-        peakOccupancy: route.peak_occupancy,
-        status: route.peak_occupancy > 150 ? "overcrowded" : 
-                route.peak_occupancy > 100 ? "good" : "optimal",
-        lastUpdated: new Date(route.updated_at).toLocaleString()
+        id: route.route_id || `R-${String(route.id || '000').padStart(3, "0")}`,
+        name: route.name || 'Unnamed Route',
+        startPoint: route.start_point || 'N/A',
+        endPoint: route.end_point || 'N/A',
+        // stops is an array of {name, lat, lng, sequence} objects - extract just the names
+        stops: Array.isArray(route.stops) 
+          ? route.stops.map((stop: any) => stop.name).join(", ") 
+          : 'No stops',
+        distance: route.distance_km || route.fare_per_km ? '0' : '0',
+        avgDuration: route.avg_duration || 'N/A',
+        dailyPassengers: route.daily_passengers || 0,
+        peakOccupancy: route.peak_occupancy || 0,
+        status: (route.peak_occupancy || 0) > 150 ? "overcrowded" : 
+                (route.peak_occupancy || 0) > 100 ? "good" : "optimal",
+        lastUpdated: route.updated_at || route.createdAt 
+          ? new Date(route.updated_at || route.createdAt).toLocaleDateString() 
+          : 'N/A'
       }));
 
       setRoutesList(formattedRoutes);
@@ -217,7 +217,6 @@ const RouteManagement = () => {
   };
 
 
-  // ---------------- HANDLE ADD ROUTE ----------------
   const handleAddRoute = async () => {
     try {
       // Validate required fields
@@ -227,12 +226,17 @@ const RouteManagement = () => {
         alert("Please fill in all required fields");
         return;
       }
+      
+      // Validate at least 2 stops
+      if (routeStops.length < 2) {
+        alert("Please add at least 2 stops to the route");
+        return;
+      }
 
-      // Convert comma-separated stops to array
-      const stopsArray = newRoute.stops
-        .split(",")
-        .map(stop => stop.trim())
-        .filter(stop => stop.length > 0);
+      // Extract stop names in sequence order
+      const stopsArray = routeStops
+        .sort((a, b) => a.sequence - b.sequence)
+        .map(stop => stop.name);
 
       // Prepare data for API
       const routeData = {
@@ -247,12 +251,9 @@ const RouteManagement = () => {
       };
 
       // Call backend API
-      const response = await fetch(`${API_BASE_URL}/routes`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.ADMIN.ROUTES}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": AUTH_TOKEN,
-        },
+        headers: createHeaders(true),
         body: JSON.stringify(routeData),
       });
 
@@ -267,13 +268,13 @@ const RouteManagement = () => {
         name: "",
         startPoint: "",
         endPoint: "",
-        stops: "",
         distance: "",
         avgDuration: "",
         dailyPassengers: "",
         peakOccupancy: "",
         status: "optimal"
       });
+      setRouteStops([]); // Clear stops
 
       // Refetch routes to get the updated list
       await fetchRoutes();
@@ -447,17 +448,13 @@ const RouteManagement = () => {
                   />
                 </div>
 
-                {/* Major Stops */}
+                {/* Route Stops */}
                 <div className="col-span-2">
-                  <label className="text-sm font-medium">Stops (comma-separated)</label>
-                  <Input
-                    placeholder="e.g., Kartarpur, Beas, Tarn Taran"
-                    value={newRoute.stops}
-                    onChange={(e) => setNewRoute({ ...newRoute, stops: e.target.value })}
+                  <label className="text-sm font-medium">Route Stops *</label>
+                  <StopsBuilder
+                    stops={routeStops}
+                    onChange={setRouteStops}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter stop names separated by commas
-                  </p>
                 </div>
 
                 {/* Distance */}
@@ -716,24 +713,7 @@ const RouteManagement = () => {
                 </CardContent>
               </Card>
 
-              {/* ALERTS */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    Alerts
-                  </CardTitle>
-                </CardHeader>
-
-                <CardContent className="space-y-3">
-                  <div className="p-3 border border-red-300 bg-red-50 rounded-md">
-                    <div className="font-medium text-red-600">Route R-003 Overcrowded</div>
-                    <div className="text-xs text-muted-foreground">
-                      Peak occupancy 165% during morning hours.
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* ALERTS - Will show real-time alerts in future */}
 
             </div>
 
@@ -749,29 +729,11 @@ const RouteManagement = () => {
               <CardTitle>Hourly Schedule Overview</CardTitle>
             </CardHeader>
 
-            <CardContent>
-              <div className="space-y-4">
-                {scheduleData.map((slot) => (
-                  <div key={slot.time} className="flex justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="text-lg font-semibold">{slot.time}</div>
-                      <div className="text-muted-foreground text-sm">{slot.buses} buses active</div>
-                    </div>
-
-                    <Badge
-                      variant={
-                        slot.occupancy > 100
-                          ? "destructive"
-                          : slot.occupancy > 80
-                          ? "secondary"
-                          : "default"
-                      }
-                    >
-                      {slot.occupancy}%
-                    </Badge>
-
-                  </div>
-                ))}
+            <CardContent className="py-12">
+              <div className="text-center text-muted-foreground">
+                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="font-semibold text-lg mb-2">No Schedule Data Available</h3>
+                <p className="text-sm">Schedule information will be displayed here once available</p>
               </div>
             </CardContent>
           </Card>
@@ -785,22 +747,12 @@ const RouteManagement = () => {
               <CardTitle>Route Optimization Recommendations</CardTitle>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-
-              <div className="p-4 bg-primary/5 border border-primary/20 rounded-md">
-                <h4 className="font-medium text-primary">Increase Frequency on R-003</h4>
-                <p className="text-sm text-muted-foreground">
-                  Add 2 buses during morning peak hours to reduce overcrowding by 25%.
-                </p>
+            <CardContent className="py-12">
+              <div className="text-center text-muted-foreground">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="font-semibold text-lg mb-2">No Optimization Data Available</h3>
+                <p className="text-sm">AI-powered optimization recommendations will appear here once enough data is collected</p>
               </div>
-
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                <h4 className="font-medium text-yellow-700">New Route Opportunity</h4>
-                <p className="text-sm text-muted-foreground">
-                  High demand detected for direct Jalandhar → Pathankot route.
-                </p>
-              </div>
-
             </CardContent>
           </Card>
         </TabsContent>

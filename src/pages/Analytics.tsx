@@ -24,8 +24,11 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getTicketAnalytics, getRealtimeAnalytics } from "@/api/admin";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Analytics = () => {
+  const { user } = useAuth();
+  const canViewRevenue = user?.role === "superadmin" || user?.role === "admin";
   // Ticket Analytics State
   const [boardingStop, setBoardingStop] = useState("");
   const [destinationStop, setDestinationStop] = useState("");
@@ -80,21 +83,18 @@ const Analytics = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedBuses = ticketAnalytics?.buses?.slice(startIndex, endIndex) || [];
 
-  // Mock Route Performance Data (since we don't have a dedicated endpoint for this yet)
-  // In a real app, this would come from an aggregation endpoint
-  // Fetch Routes for Performance Data
-  const { data: routesData } = useQuery({
-    queryKey: ["allRoutes"],
-    queryFn: () => import("@/api/admin").then(mod => mod.getAllRoutes()),
+  // Fetch Route Performance Data
+  const { data: routePerformanceData, isLoading: isLoadingPerformance } = useQuery({
+    queryKey: ["routePerformance"],
+    queryFn: () => import("@/api/admin").then(mod => mod.getRoutePerformance()),
   });
 
-  const routePerformance = routesData?.routes.map(route => ({
+  const routePerformance = routePerformanceData?.map((route: any) => ({
     route: route.name,
     passengers: route.daily_passengers || 0,
-    efficiency: route.peak_occupancy ? Math.min(100, Math.round(100 - Math.abs(route.peak_occupancy - 100))) : 85, // Mock efficiency based on occupancy
-    revenue: `₹${((route.daily_passengers || 0) * (route.fare_per_km || 2) * (route.distance_km || 20)).toLocaleString()}`, // Estimate revenue
-    satisfaction: 4.0 + (Math.random() * 1), // Mock satisfaction
-    trend: (route.peak_occupancy || 0) > 90 ? "up" : "stable"
+    efficiency: route.efficiency || 0,
+    revenue: `₹${(route.revenue || 0).toLocaleString()}`,
+    trend: route.efficiency > 80 ? "up" : route.efficiency < 50 ? "down" : "stable"
   })) || [];
 
   return (
@@ -128,6 +128,11 @@ const Analytics = () => {
               <CardTitle>Route Performance Analysis</CardTitle>
             </CardHeader>
             <CardContent>
+              {isLoadingPerformance ? (
+                 <div className="flex items-center justify-center h-40">
+                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                 </div>
+              ) : (
               <div className="space-y-4">
                 {routePerformance.map((route, index) => (
                   <div key={index} className="p-4 rounded-lg border border-border">
@@ -138,7 +143,7 @@ const Analytics = () => {
                       </Badge>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className={`grid ${canViewRevenue ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
                       <div>
                         <div className="flex items-center space-x-1 mb-1">
                           <Users className="h-4 w-4 text-muted-foreground" />
@@ -160,6 +165,7 @@ const Analytics = () => {
                         </div>
                       </div>
                       
+                      {canViewRevenue && (
                       <div>
                         <div className="flex items-center space-x-1 mb-1">
                           <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -167,17 +173,12 @@ const Analytics = () => {
                         </div>
                         <div className="text-lg font-semibold text-foreground">{route.revenue}</div>
                       </div>
-                      
-                      <div>
-                        <div className="flex items-center space-x-1 mb-1">
-                          <span className="text-sm text-muted-foreground">Satisfaction</span>
-                        </div>
-                        <div className="text-lg font-semibold text-foreground">{route.satisfaction}/5</div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -344,6 +345,7 @@ const Analytics = () => {
                       </div>
                     </div>
 
+                    {canViewRevenue && (
                     <div className="p-4 rounded-lg bg-accent/50">
                       <div className="flex items-center space-x-2 mb-1">
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -353,6 +355,7 @@ const Analytics = () => {
                         ₹{ticketAnalytics.combined_totals.total_revenue.toLocaleString()}
                       </div>
                     </div>
+                    )}
 
                     <div className="p-4 rounded-lg bg-accent/50">
                       <div className="flex items-center space-x-2 mb-1">
@@ -408,14 +411,16 @@ const Analytics = () => {
                           </div>
                           <div>
                             <div className="text-sm text-muted-foreground mb-1">Seats Occupied</div>
-                            <div className="text-lg font-semibold text-foreground">{bus.seats_occupied}</div>
+                            <div className="text-lg font-semibold text-foreground">{bus.seats_occupied}                            </div>
                           </div>
+                          {canViewRevenue && (
                           <div>
                             <div className="text-sm text-muted-foreground mb-1">Revenue</div>
                             <div className="text-lg font-semibold text-foreground">
                               ₹{bus.total_revenue.toLocaleString()}
                             </div>
                           </div>
+                          )}
                           <div>
                             <div className="text-sm text-muted-foreground mb-1">Avg Fare</div>
                             <div className="text-lg font-semibold text-foreground">
